@@ -1,0 +1,37 @@
+---
+- name: Remove azure-cli container
+  shell: docker rm -f azure-cli-storage || true
+  when: storage_account_name is defined
+
+# Run azure-cli container
+- name: Docker run azure-cli
+  shell: "docker run -it --name azure-cli-storage -d docker.artifactory.eu.scor.local/azure-cli:{{ docker_tag }}"
+  when: storage_account_name is defined
+
+# Az cloud set
+- name: Az cloud set
+  shell: docker exec azure-cli-storage /bin/bash -c "az cloud set --name "{{ cloud_environment }}""
+  when: storage_account_name is defined
+
+# Az login
+- name: Az login
+  shell: docker exec azure-cli-storage /bin/bash -c "az login --service-principal -u {{ client_id }} -p {{ secret }} -t {{ tenant_id }}"
+  when: storage_account_name is defined
+
+# Az account set subscription
+- name: Az account set subscribtion
+  shell: docker exec azure-cli-storage /bin/bash -c "az account set --subscription {{ subscription_id }}"
+  when: storage_account_name is defined
+
+- name: Az Storage account create with access_tier + TLS1.2 + https-only + Disable blob public access
+  shell: docker exec azure-cli-storage /bin/bash -c "az storage account create -n {{ storage_account_name | lower }} -g {{ resource_group_name }} --kind {{ storage_account_kind }} -l {{ location }} --sku {{ storage_account_type }} --access-tier {{ storage_account_access_tier }} --min-tls-version {{ storage_account_min_tls_version }} --https-only {{ storage_account_https_only }} --allow-blob-public-access false --default-action Deny --public-network-access {{storage_account_public_network_access}}"
+  when: storage_account_access_tier is defined and storage_account_name is defined and (enable_hierarchical_namespace is undefined or (enable_hierarchical_namespace is defined and enable_hierarchical_namespace | lower == ('false')))
+
+- name: Az Storage account create without access_tier + TLS1.2 + https-only + Disable blob public access
+  shell: docker exec azure-cli-storage /bin/bash -c "az storage account create -n {{ storage_account_name | lower }} -g {{ resource_group_name }} --kind {{ storage_account_kind }} -l {{ location }} --sku {{ storage_account_type }} --min-tls-version {{ storage_account_min_tls_version }} --https-only {{ storage_account_https_only }} --allow-blob-public-access false --default-action Deny --public-network-access {{storage_account_public_network_access}}"
+  when: storage_account_access_tier is undefined and storage_account_name is defined and (enable_hierarchical_namespace is undefined or (enable_hierarchical_namespace is defined and enable_hierarchical_namespace | lower == ('false')))
+
+# Datalake creation
+- name: Az Storage account create DataLake without access_tier + TLS1.2 + https-only + Disable blob public access
+  shell: docker exec azure-cli-storage /bin/bash -c "az storage account create -n {{ storage_account_name | lower }} -g {{ resource_group_name }} --kind {{ storage_account_kind }} -l {{ location }} --sku {{ storage_account_type }} --min-tls-version {{ storage_account_min_tls_version }} --https-only {{ storage_account_https_only }} --allow-blob-public-access false --default-action Deny --enable-hierarchical-namespace True --public-network-access {{storage_account_public_network_access}}"
+  when: storage_account_access_tier is undefined and storage_account_name is defined and (enable_hierarchical_namespace is defined and enable_hierarchical_namespace | lower == ('true'))
